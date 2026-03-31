@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Map / Bản đồ ruộng</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--hdr:52px;--sb:300px;--dp:360px}
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+/* HEADER */
+#hdr{height:var(--hdr);background:#185fa5;color:#fff;display:flex;align-items:center;gap:10px;padding:0 14px;flex-shrink:0;z-index:1000;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#hdr .title{font-size:16px;font-weight:700;letter-spacing:.5px;flex:1}
+.hbtn{height:32px;padding:0 12px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:12px;white-space:nowrap}
+.hbtn:hover{background:rgba(255,255,255,.25)}
+.hbtn-g{background:#1d9e75;border-color:#1d9e75}.hbtn-g:hover{background:#0f6e56}
+.hbtn-r{background:#a32d2d;border-color:#a32d2d}.hbtn-r:hover{background:#791f1f}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.d-g{background:#4caf50}.d-y{background:#ff9800}.d-r{background:#f44336}.d-x{background:#999}
+/* BODY LAYOUT */
+#body{flex:1;display:flex;overflow:hidden;position:relative}
+/* SIDEBAR */
+#sb{width:var(--sb);background:#fff;border-right:1px solid #ddd;display:flex;flex-direction:column;flex-shrink:0;z-index:500}
+#sb-top{padding:10px;border-bottom:1px solid #eee;background:#f8f9fa}
+#sb-search{width:100%;height:30px;padding:0 8px;font-size:12px;border:1px solid #ccc;border-radius:5px;margin-bottom:6px}
+.sb-row{display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
+select.sf{height:28px;padding:0 6px;font-size:11px;border:1px solid #ccc;border-radius:4px;background:#fff;flex:1;min-width:80px}
+.sbtn{height:28px;padding:0 8px;font-size:11px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;white-space:nowrap}
+.sbtn:hover{background:#f0f0f0}
+.sbtn-a{background:#185fa5;color:#fff;border-color:#185fa5}.sbtn-a:hover{background:#0c447c}
+#field-list{flex:1;overflow-y:auto}
+.fi{padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;transition:background .1s}
+.fi:hover{background:#f0f7ff}
+.fi.active{background:#e6f1fb;border-left:3px solid #185fa5}
+.fi-name{font-weight:600;font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-sub{font-size:11px;color:#888;display:flex;gap:8px;flex-wrap:wrap}
+.fi-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;margin-top:2px}
+.sb-footer{padding:8px 10px;border-top:1px solid #eee;background:#f8f9fa;font-size:11px;color:#888}
+/* MAP */
+#map{flex:1;z-index:100}
+/* DETAIL PANEL */
+#dp{width:0;background:#fff;border-left:1px solid #ddd;display:flex;flex-direction:column;overflow:hidden;transition:width .2s;z-index:500;flex-shrink:0}
+#dp.open{width:var(--dp)}
+#dp-inner{width:var(--dp);display:flex;flex-direction:column;height:100%;overflow:hidden}
+#dp-hdr{padding:10px 12px;background:#185fa5;color:#fff;display:flex;align-items:center;gap:8px;flex-shrink:0}
+#dp-hdr .dp-title{flex:1;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
+#dp-tabs{display:flex;border-bottom:1px solid #ddd;background:#f8f9fa;flex-shrink:0}
+.dp-tab{flex:1;padding:8px 4px;text-align:center;cursor:pointer;font-size:11px;border-bottom:2px solid transparent;color:#888}
+.dp-tab.on{color:#185fa5;border-bottom-color:#185fa5;font-weight:600;background:#fff}
+#dp-body{flex:1;overflow-y:auto;padding:12px}
+.fld{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.fld label{font-size:11px;color:#666;font-weight:600}
+.fld input,.fld select,.fld textarea{border:1px solid #ccc;border-radius:5px;padding:5px 8px;font-size:13px;width:100%;font-family:Arial}
+.fld textarea{resize:vertical;height:60px}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:#185fa5}
+.fld-row{display:flex;gap:8px}
+.fld-row .fld{flex:1}
+.section-hdr{font-size:12px;font-weight:700;color:#185fa5;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #dce9f5;display:flex;align-items:center;justify-content:space-between}
+.log-entry{background:#f8f9fa;border-radius:5px;padding:8px;margin-bottom:6px;font-size:12px;position:relative}
+.log-entry .log-date{font-weight:600;color:#185fa5}
+.log-entry .log-del{position:absolute;top:4px;right:6px;background:none;border:none;cursor:pointer;color:#ccc;font-size:14px}
+.log-entry .log-del:hover{color:#e24b4a}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.photo-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;cursor:pointer;border:1px solid #ddd}
+.photo-add{width:100%;aspect-ratio:1;border:2px dashed #ccc;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#aaa;font-size:22px;background:#f8f9fa}
+.photo-add:hover{border-color:#185fa5;color:#185fa5}
+.dir-btn{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #ddd;border-radius:7px;margin-bottom:8px;cursor:pointer;background:#f8f9fa;font-size:13px;text-decoration:none;color:#222}
+.dir-btn:hover{background:#e6f1fb;border-color:#185fa5}
+.dir-btn .dir-icon{font-size:20px}
+.dir-btn .dir-sub{font-size:11px;color:#888}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-area{background:#e6f1fb;color:#185fa5}
+.badge-season{background:#eaf3de;color:#3b6d11}
+.dp-actions{padding:10px 12px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0}
+.dp-actions button{flex:1;height:32px;font-size:12px;border-radius:5px;border:1px solid #ccc;background:#fff;cursor:pointer}
+.dp-actions button:hover{background:#f0f0f0}
+.btn-del-field{border-color:#f09595!important;color:#a32d2d!important}
+.btn-del-field:hover{background:#fcebeb!important}
+.btn-save-field{background:#185fa5!important;color:#fff!important;border-color:#185fa5!important}
+.btn-save-field:hover{background:#0c447c!important}
+/* MODALS */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center}
+.ov.on{display:flex}
+.modal{background:#fff;border-radius:12px;padding:20px;width:380px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.modal h3{font-size:15px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:8px}
+.modal .fld input,.modal .fld select{width:100%}
+.mdb{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.mbtn{height:32px;padding:0 14px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}
+.mbtn-p{background:#185fa5;color:#fff;border-color:#185fa5}.mbtn-p:hover{background:#0c447c}
+.mbtn:hover{background:#f0f0f0}
+.cfield-row{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #eee}
+.cfield-row .cf-name{flex:1;font-size:13px}
+.cfield-row .cf-type{font-size:11px;color:#888;background:#f0f0f0;padding:1px 6px;border-radius:3px}
+.cf-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:16px}.cf-del:hover{color:#e24b4a}
+/* PHOTO MODAL */
+#photo-modal-img{max-width:100%;max-height:70vh;border-radius:8px;display:block;margin:0 auto}
+/* Connect modal */
+.info-box{background:#e6f1fb;border-radius:6px;padding:10px;font-size:12px;color:#185fa5;line-height:1.6;margin-bottom:4px}
+code{background:#f0f0f0;padding:1px 5px;border-radius:3px;font-size:11px;word-break:break-all}
+/* Spinner */
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Leaflet draw toolbar z-index fix */
+.leaflet-draw-toolbar{z-index:800!important}
+.leaflet-top.leaflet-right{z-index:800!important}
+/* Responsive */
+@media(max-width:768px){
+  #sb{display:none}
+  #dp.open{width:100%}
+}
+/* Status bar */
+#statusbar{height:24px;background:#f0f2f5;border-top:1px solid #ddd;padding:0 12px;display:flex;align-items:center;gap:12px;font-size:11px;color:#666;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="title">🌾 <span data-t="appTitle">Field Map</span></div>
+  <span class="dot d-x" id="sync-dot"></span>
+  <span id="sync-msg" style="font-size:11px;opacity:.8" data-t="notConnected">Not connected</span>
+  <button class="hbtn hbtn-g" id="btn-save" onclick="saveNow()" style="display:none" data-t="saveNow">☁ Save</button>
+  <button class="hbtn" onclick="openConnect()" data-t="connectData">🔗 Connect</button>
+  <button class="hbtn" onclick="openCustomFields()" data-t="customCols">⚙ Columns</button>
+  <button class="hbtn" onclick="openImportExport()" data-t="importExport">↕ GeoJSON</button>
+  <button class="hbtn" id="btn-lang" onclick="toggleLang()">EN</button>
+  <div id="uinfo" style="display:none;font-size:12px;display:flex;align-items:center;gap:6px">
+    <img id="uavatar" style="width:26px;height:26px;border-radius:50%" src="" alt="">
+    <span id="uname"></span>
+  </div>
+  <button class="hbtn hbtn-r" id="btn-logout" onclick="signOut()" style="display:none" data-t="signOut">Sign out</button>
+  <button class="hbtn hbtn-g" id="btn-login" onclick="signIn()" data-t="signIn">Sign in with Google</button>
+</div>
+
+<!-- BODY -->
+<div id="body">
+  <!-- SIDEBAR -->
+  <div id="sb">
+    <div id="sb-top">
+      <input type="text" id="sb-search" data-placeholder-t="searchFields" placeholder="Search fields..." oninput="filterList()">
+      <div class="sb-row">
+        <select class="sf" id="f-coop" onchange="filterList()"><option value="" data-t="allCoops">All cooperatives</option></select>
+        <select class="sf" id="f-season" onchange="filterList()"><option value="" data-t="allSeasons">All seasons</option></select>
+      </div>
+      <div class="sb-row">
+        <select class="sf" id="f-sort" onchange="filterList()">
+          <option value="name" data-t="sortName">Name</option>
+          <option value="area" data-t="sortArea">Area</option>
+          <option value="farmer" data-t="sortFarmer">Farmer</option>
+          <option value="season" data-t="sortSeason">Season</option>
+          <option value="updated" data-t="sortUpdated">Updated</option>
+        </select>
+        <button class="sbtn" id="sort-dir-btn" onclick="toggleSortDir()">↑ A-Z</button>
+        <button class="sbtn sbtn-a" onclick="startDrawing()" data-t="addField">+ Add</button>
+      </div>
+    </div>
+    <div id="field-list"></div>
+    <div class="sb-footer">
+      <span id="sb-count">0 fields</span> &nbsp;|&nbsp; <span id="sb-area-total">0 ha total</span>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- DETAIL PANEL -->
+  <div id="dp">
+    <div id="dp-inner">
+      <div id="dp-hdr">
+        <span class="dp-title" id="dp-field-name">Field</span>
+        <span class="badge badge-area" id="dp-area">0 m²</span>
+        <button class="dp-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div id="dp-tabs">
+        <div class="dp-tab on" onclick="dpTab('info')" id="dpt-info" data-t="tabInfo">Info</div>
+        <div class="dp-tab" onclick="dpTab('log')" id="dpt-log" data-t="tabLog">Log</div>
+        <div class="dp-tab" onclick="dpTab('photos')" id="dpt-photos" data-t="tabPhotos">Photos</div>
+        <div class="dp-tab" onclick="dpTab('nav')" id="dpt-nav" data-t="tabNav">GPS</div>
+      </div>
+      <div id="dp-body">
+        <!-- Info tab -->
+        <div id="tab-info">
+          <div class="fld"><label data-t="fieldName">Field name</label><input type="text" id="d-name"></div>
+          <div class="fld-row">
+            <div class="fld"><label data-t="farmerName">Farmer</label><input type="text" id="d-farmer"></div>
+            <div class="fld"><label data-t="phone">Phone</label><input type="text" id="d-phone"></div>
+          </div>
+          <div class="fld-row">
+            <div class="fld"><label data-t="household">Household</label><input type="text" id="d-household"></div>
+            <div class="fld"><label data-t="cooperative">Cooperative</label><input type="text" id="d-coop"></div>
+          </div>
+          <div class="fld-row">
+            <div class="fld"><label data-t="season">Season</label><input type="text" id="d-season" placeholder="VD: ĐX 2025-2026"></div>
+            <div class="fld"><label data-t="variety">Rice variety</label><input type="text" id="d-variety" placeholder="OM5451..."></div>
+          </div>
+          <div class="fld"><label data-t="notes">Notes</label><textarea id="d-notes"></textarea></div>
+          <div class="fld"><label data-t="fieldColor">Color</label><input type="color" id="d-color" value="#e53935" style="height:32px;width:100%;padding:2px 4px"></div>
+          <!-- Custom fields injected here -->
+          <div id="custom-fields-dp"></div>
+        </div>
+        <!-- Log tab -->
+        <div id="tab-log" style="display:none">
+          <div class="section-hdr" data-t="wateringLog">Watering log <button class="sbtn sbtn-a" onclick="addLogEntry()" style="font-size:11px;height:24px" data-t="addEntry">+ Add</button></div>
+          <div id="log-entries"></div>
+          <div class="section-hdr" data-t="activityLog">Activity log <button class="sbtn sbtn-a" onclick="addActivityEntry()" style="font-size:11px;height:24px" data-t="addEntry">+ Add</button></div>
+          <div id="activity-entries"></div>
+        </div>
+        <!-- Photos tab -->
+        <div id="tab-photos" style="display:none">
+          <div id="photo-grid" class="photo-grid"></div>
+          <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
+        </div>
+        <!-- Nav tab -->
+        <div id="tab-nav" style="display:none">
+          <div style="font-size:12px;color:#888;margin-bottom:10px" data-t="navDesc">Get directions to this field</div>
+          <a id="nav-from-gps" class="dir-btn" href="#" target="_blank">
+            <span class="dir-icon">📍</span>
+            <div><div data-t="fromGPS">From my current location</div><div class="dir-sub" data-t="opensGoogleMaps">Opens Google Maps</div></div>
+          </a>
+          <div class="section-hdr" data-t="fieldToField">Field → Field</div>
+          <div class="fld"><label data-t="fromField">From field</label>
+            <select id="nav-from-field"><option value="" data-t="selectField">Select field...</option></select>
+          </div>
+          <div style="margin-top:6px">
+            <a id="nav-field-btn" class="dir-btn" href="#" target="_blank">
+              <span class="dir-icon">🗺️</span>
+              <div><div data-t="getDirections">Get directions</div><div class="dir-sub" data-t="opensGoogleMaps">Opens Google Maps</div></div>
+            </a>
+          </div>
+          <div class="section-hdr" data-t="fieldCoords">Coordinates</div>
+          <div style="font-size:11px;color:#555;background:#f8f9fa;padding:8px;border-radius:5px;word-break:break-all" id="field-coords"></div>
+        </div>
+      </div>
+      <div class="dp-actions">
+        <button onclick="zoomToField()" data-t="zoomTo">🔍 Zoom</button>
+        <button class="btn-del-field" onclick="deleteField()" data-t="deleteField">🗑 Delete</button>
+        <button class="btn-save-field" onclick="saveField()" data-t="saveField">💾 Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="map-coords" style="min-width:160px">-</span>
+  <span id="draw-hint" style="flex:1"></span>
+  <span id="total-fields-status"></span>
+</div>
+
+<!-- MODALS -->
+<!-- Connect modal -->
+<div class="ov" id="ov-connect" onclick="bgClose('ov-connect',event)">
+  <div class="modal" style="width:420px">
+    <h3>🔗 <span data-t="connectData">Connect to data</span></h3>
+    <div class="info-box" id="connect-info">
+      <strong data-t="howToConnect">How to connect:</strong><br>
+      <span data-t="connectStep1">1. Admin signs in → clicks Save → shares the Drive file ID</span><br>
+      <span data-t="connectStep2">2. Employees paste the file ID below to access the same database</span><br>
+      <span data-t="connectStep3">3. Make sure admin has shared the Drive file with your Google account</span>
+    </div>
+    <div class="fld"><label data-t="driveFileId">Google Drive File ID</label>
+      <input type="text" id="connect-file-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+    </div>
+    <div style="font-size:11px;color:#888" data-t="connectHint">Leave empty to create a new database file (admin only)</div>
+    <div id="connect-status" style="font-size:12px;color:#185fa5;min-height:18px"></div>
+    <div class="mdb">
+      <button class="mbtn" onclick="closeM('ov-connect')" data-t="cancel">Cancel</button>
+      <button class="mbtn mbtn-p" onclick="applyConnect()" data-t="connect">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom columns modal -->
+<div class="ov" id="ov-cfields" onclick="bgClose('ov-cfields',event)">
+  <div class="modal">
+    <h3>⚙ <span data-t="customCols">Custom columns</span></h3>
+    <div id="cfields-list"></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input type="text" id="cf-new-name" style="flex:1;height:30px;padding:0 8px;border:1px solid #ccc;border-radius:5px;font-size:12px" data-placeholder-t="newColumnName" placeholder="Column name...">
+      <select id="cf-new-type" style="height:30px;padding:0 6px;border:1px solid #ccc;border-radius:5px;font-size:12px;background:#fff">
+        <option value="text">Text</option>
+        <option value="number">Number</option>
+        <option value="date">Date</option>
+        <option value="select">Select list</option>
+      </select>
+      <button class="sbtn sbtn-a" onclick="addCustomField()" data-t="add">+ Add</button>
+    </div>
+    <div id="cf-select-opts" style="display:none;margin-top:6px">
+      <input type="text" id="cf-opts" style="width:100%;height:30px;padding:0 8px;border:1px solid #ccc;border-radius:5px;font-size:12px" placeholder="Options: A, B, C (comma separated)">
+    </div>
+    <div class="mdb">
+      <button class="mbtn" onclick="closeM('ov-cfields')" data-t="close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import/Export modal -->
+<div class="ov" id="ov-io" onclick="bgClose('ov-io',event)">
+  <div class="modal" style="width:420px">
+    <h3>↕ GeoJSON Import / Export</h3>
+    <p style="font-size:12px;color:#666">GeoJSON works with Google Earth, QGIS, ArcGIS and most GIS software.</p>
+    <textarea id="io-area" style="height:160px;font-size:11px"></textarea>
+    <div class="mdb">
+      <button class="mbtn" onclick="copyIO()" data-t="copy">Copy</button>
+      <button class="mbtn" onclick="importGeoJSON()" data-t="import">↓ Import</button>
+      <button class="mbtn mbtn-p" onclick="exportGeoJSON()" data-t="export">↑ Export</button>
+      <button class="mbtn mbtn-p" onclick="downloadGeoJSON()" data-t="download">⬇ Download</button>
+    </div>
+    <div class="mdb" style="margin-top:0">
+      <button class="mbtn" onclick="closeM('ov-io')" data-t="close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo viewer modal -->
+<div class="ov" id="ov-photo" onclick="closeM('ov-photo')">
+  <div style="max-width:90vw;max-height:90vh;position:relative">
+    <img id="photo-modal-img" src="" alt="">
+    <button onclick="closeM('ov-photo')" style="position:absolute;top:-14px;right:-14px;background:#333;color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px">✕</button>
+  </div>
+</div>
+
+<!-- Log entry modal -->
+<div class="ov" id="ov-log" onclick="bgClose('ov-log',event)">
+  <div class="modal">
+    <h3 id="log-modal-title">Add entry</h3>
+    <div class="fld"><label data-t="date">Date</label><input type="date" id="log-date"></div>
+    <div class="fld"><label data-t="type">Type</label>
+      <select id="log-type">
+        <option value="watering" data-t="watering">Watering / Irrigation</option>
+        <option value="fertilizer" data-t="fertilizer">Fertilizer application</option>
+        <option value="pesticide" data-t="pesticide">Pesticide application</option>
+        <option value="harvest" data-t="harvest">Harvest</option>
+        <option value="planting" data-t="planting">Planting</option>
+        <option value="other" data-t="other">Other</option>
+      </select>
+    </div>
+    <div class="fld"><label data-t="notes">Notes</label><textarea id="log-note" style="height:70px"></textarea></div>
+    <div class="mdb">
+      <button class="mbtn" onclick="closeM('ov-log')" data-t="cancel">Cancel</button>
+      <button class="mbtn mbtn-p" onclick="saveLogEntry()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+// ── TRANSLATIONS ───────────────────────────────────────────────────────────
+var LANG='vi';
+var T={
+  vi:{
+    appTitle:'Bản đồ ruộng',notConnected:'Chưa kết nối',saveNow:'☁ Lưu',
+    connectData:'🔗 Kết nối dữ liệu',customCols:'⚙ Cột tùy chỉnh',importExport:'↕ GeoJSON',
+    signIn:'Đăng nhập Google',signOut:'Đăng xuất',
+    searchFields:'Tìm kiếm thửa ruộng...',allCoops:'Tất cả HTX',allSeasons:'Tất cả vụ',
+    sortName:'Tên',sortArea:'Diện tích',sortFarmer:'Nông dân',sortSeason:'Vụ',sortUpdated:'Cập nhật',
+    addField:'+ Thêm',
+    tabInfo:'Thông tin',tabLog:'Nhật ký',tabPhotos:'Ảnh',tabNav:'GPS',
+    fieldName:'Tên thửa ruộng',farmerName:'Tên nông dân',phone:'Điện thoại',
+    household:'Hộ gia đình',cooperative:'Hợp tác xã',
+    season:'Vụ mùa',variety:'Giống lúa',notes:'Ghi chú',fieldColor:'Màu sắc',
+    wateringLog:'Nhật ký tưới nước',activityLog:'Nhật ký hoạt động',addEntry:'+ Thêm',
+    navDesc:'Chỉ đường đến thửa ruộng này',fromGPS:'Từ vị trí hiện tại của tôi',
+    opensGoogleMaps:'Mở Google Maps',fieldToField:'Ruộng → Ruộng',
+    fromField:'Từ thửa ruộng',getDirections:'Xem chỉ đường',
+    fieldCoords:'Tọa độ',
+    zoomTo:'🔍 Phóng to',deleteField:'🗑 Xóa',saveField:'💾 Lưu',
+    howToConnect:'Cách kết nối:',
+    connectStep1:'1. Admin đăng nhập → nhấn Lưu → chia sẻ File ID Drive',
+    connectStep2:'2. Nhân viên dán File ID bên dưới để truy cập cùng cơ sở dữ liệu',
+    connectStep3:'3. Admin cần chia sẻ file Drive với tài khoản Google của bạn',
+    driveFileId:'Google Drive File ID',connectHint:'Để trống để tạo cơ sở dữ liệu mới (chỉ admin)',
+    connect:'Kết nối',cancel:'Hủy',close:'Đóng',
+    copy:'Sao chép',import:'↓ Nhập',export:'↑ Xuất',download:'⬇ Tải xuống',
+    date:'Ngày',type:'Loại',
+    watering:'Tưới nước / Thủy lợi',fertilizer:'Bón phân',pesticide:'Phun thuốc',
+    harvest:'Thu hoạch',planting:'Gieo trồng',other:'Khác',
+    newColumnName:'Tên cột mới...',add:'+ Thêm',save:'Lưu',
+    selectField:'Chọn thửa ruộng...',
+    drawHint:'Nhấp để vẽ điểm góc, nhấp đúp để hoàn thành',
+    deleteConfirm:'Xóa thửa ruộng này?',
+    fieldsSuffix:'thửa ruộng',haSuffix:'ha tổng cộng',
+  },
+  en:{
+    appTitle:'Field Map',notConnected:'Not connected',saveNow:'☁ Save',
+    connectData:'🔗 Connect data',customCols:'⚙ Columns',importExport:'↕ GeoJSON',
+    signIn:'Sign in with Google',signOut:'Sign out',
+    searchFields:'Search fields...',allCoops:'All cooperatives',allSeasons:'All seasons',
+    sortName:'Name',sortArea:'Area',sortFarmer:'Farmer',sortSeason:'Season',sortUpdated:'Updated',
+    addField:'+ Add',
+    tabInfo:'Info',tabLog:'Log',tabPhotos:'Photos',tabNav:'GPS',
+    fieldName:'Field name',farmerName:'Farmer name',phone:'Phone',
+    household:'Household',cooperative:'Cooperative',
+    season:'Season',variety:'Rice variety',notes:'Notes',fieldColor:'Color',
+    wateringLog:'Watering log',activityLog:'Activity log',addEntry:'+ Add',
+    navDesc:'Get directions to this field',fromGPS:'From my current location',
+    opensGoogleMaps:'Opens Google Maps',fieldToField:'Field → Field',
+    fromField:'From field',getDirections:'Get directions',
+    fieldCoords:'Coordinates',
+    zoomTo:'🔍 Zoom to',deleteField:'🗑 Delete',saveField:'💾 Save',
+    howToConnect:'How to connect:',
+    connectStep1:'1. Admin signs in → clicks Save → shares the Drive file ID',
+    connectStep2:'2. Employees paste the file ID below to access the same database',
+    connectStep3:'3. Make sure admin has shared the Drive file with your Google account',
+    driveFileId:'Google Drive File ID',connectHint:'Leave empty to create a new database file (admin only)',
+    connect:'Connect',cancel:'Cancel',close:'Close',
+    copy:'Copy',import:'↓ Import',export:'↑ Export',download:'⬇ Download',
+    date:'Date',type:'Type',
+    watering:'Watering / Irrigation',fertilizer:'Fertilizer application',pesticide:'Pesticide application',
+    harvest:'Harvest',planting:'Planting',other:'Other',
+    newColumnName:'Column name...',add:'+ Add',save:'Save',
+    selectField:'Select field...',
+    drawHint:'Click to place corners, double-click to finish',
+    deleteConfirm:'Delete this field?',
+    fieldsSuffix:'fields',haSuffix:'ha total',
+  }
+};
+function t(k){return(T[LANG]&&T[LANG][k])||T['en'][k]||k;}
+function applyTranslations(){
+  document.querySelectorAll('[data-t]').forEach(function(el){
+    var k=el.getAttribute('data-t');
+    if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT') return;
+    el.textContent=t(k);
+  });
+  document.querySelectorAll('[data-placeholder-t]').forEach(function(el){
+    el.placeholder=t(el.getAttribute('data-placeholder-t'));
+  });
+}
+function toggleLang(){
+  LANG=LANG==='vi'?'en':'vi';
+  document.getElementById('btn-lang').textContent=LANG==='vi'?'EN':'VI';
+  document.documentElement.lang=LANG;
+  applyTranslations();
+  filterList();
+  if(currentFieldId) renderDetailPanel(currentFieldId);
+}
+
+// ── DATA ───────────────────────────────────────────────────────────────────
+var fields=[];
+var customFieldDefs=[];
+var nid=1;
+var currentFieldId=null;
+var sortDir='asc';
+var logEditIndex=null;
+var logEditType=null;
+
+function newField(coords){
+  return{
+    id:'f'+(Date.now()),
+    name:'Field '+(fields.length+1),
+    farmer:'',phone:'',household:'',coop:'',
+    season:'',variety:'',notes:'',
+    color:'#e53935',
+    coords:coords,
+    wateringLog:[],activityLog:[],
+    photos:[],
+    customValues:{},
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+}
+
+function calcArea(coords){
+  if(!coords||coords.length<3)return 0;
+  var R=6371000,area=0,n=coords.length;
+  for(var i=0;i<n;i++){
+    var j=(i+1)%n;
+    var xi=coords[i][1]*Math.PI/180;
+    var xj=coords[j][1]*Math.PI/180;
+    var yi=coords[i][0]*Math.PI/180;
+    var yj=coords[j][0]*Math.PI/180;
+    area+=(xj-xi)*(2+Math.sin(yi)+Math.sin(yj));
+  }
+  return Math.abs(area*R*R/2);
+}
+function fmtArea(m2){
+  if(m2>=10000)return(m2/10000).toFixed(2)+' ha';
+  return Math.round(m2)+' m²';
+}
+function centroid(coords){
+  var lat=0,lng=0;
+  coords.forEach(function(c){lat+=c[0];lng+=c[1];});
+  return[lat/coords.length,lng/coords.length];
+}
+
+// ── MAP ────────────────────────────────────────────────────────────────────
+var map=L.map('map',{zoomControl:true}).setView([10.4,105.5],13);
+
+var esriSat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+  attribution:'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',maxZoom:19
+});
+var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; OpenStreetMap contributors',maxZoom:19
+});
+esriSat.addTo(map);
+
+L.control.layers({'🛰 Satellite (Esri)':esriSat,'🗺 OpenStreetMap':osm},{},{position:'topright'}).addTo(map);
+
+map.on('mousemove',function(e){
+  document.getElementById('map-coords').textContent=e.latlng.lat.toFixed(6)+', '+e.latlng.lng.toFixed(6);
+});
+
+// Draw control
+var drawnItems=new L.FeatureGroup();
+map.addLayer(drawnItems);
+var drawControl=new L.Control.Draw({
+  draw:{
+    polygon:{shapeOptions:{color:'#e53935',fillOpacity:.25},showArea:true},
+    rectangle:{shapeOptions:{color:'#e53935',fillOpacity:.25}},
+    polyline:false,circle:false,circlemarker:false,marker:false
+  },
+  edit:{featureGroup:drawnItems,remove:false}
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED,function(e){
+  var layer=e.layer;
+  var coords=layer.getLatLngs()[0].map(function(ll){return[ll.lat,ll.lng];});
+  var f=newField(coords);
+  fields.push(f);
+  addFieldToMap(f);
+  renderList();
+  openDetail(f.id);
+  markDirty();
+});
+
+map.on(L.Draw.Event.EDITED,function(e){
+  e.layers.eachLayer(function(layer){
+    var fid=layer.options.fieldId;
+    if(!fid)return;
+    var f=fields.find(function(x){return x.id===fid;});
+    if(f){
+      f.coords=layer.getLatLngs()[0].map(function(ll){return[ll.lat,ll.lng];});
+      f.updatedAt=new Date().toISOString();
+      if(currentFieldId===fid){
+        document.getElementById('dp-area').textContent=fmtArea(calcArea(f.coords));
+      }
+      markDirty();
+    }
+  });
+});
+
+function startDrawing(){
+  new L.Draw.Polygon(map,{shapeOptions:{color:'#e53935',fillOpacity:.25}}).enable();
+  document.getElementById('draw-hint').textContent=t('drawHint');
+  setTimeout(function(){document.getElementById('draw-hint').textContent='';},5000);
+}
+
+var mapLayers={};
+function addFieldToMap(f){
+  if(mapLayers[f.id]){drawnItems.removeLayer(mapLayers[f.id]);}
+  var poly=L.polygon(f.coords,{
+    color:f.color||'#e53935',fillColor:f.color||'#e53935',fillOpacity:.3,weight:2,fieldId:f.id
+  });
+  poly.bindTooltip(f.name,{permanent:false,direction:'center'});
+  poly.on('click',function(){openDetail(f.id);});
+  drawnItems.addLayer(poly);
+  mapLayers[f.id]=poly;
+}
+function recolorField(f){
+  if(mapLayers[f.id]){
+    mapLayers[f.id].setStyle({color:f.color,fillColor:f.color});
+  }
+}
+function loadAllFieldsToMap(){
+  drawnItems.clearLayers();
+  mapLayers={};
+  fields.forEach(addFieldToMap);
+}
+
+// ── SIDEBAR LIST ───────────────────────────────────────────────────────────
+function buildFilterOptions(){
+  var coops=[...new Set(fields.map(function(f){return f.coop;}).filter(Boolean))].sort();
+  var seasons=[...new Set(fields.map(function(f){return f.season;}).filter(Boolean))].sort();
+  var cs=document.getElementById('f-coop'),curC=cs.value;
+  cs.innerHTML='<option value="">'+t('allCoops')+'</option>';
+  coops.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
+  cs.value=curC;
+  var ss=document.getElementById('f-season'),curS=ss.value;
+  ss.innerHTML='<option value="">'+t('allSeasons')+'</option>';
+  seasons.forEach(function(s){var o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o);});
+  ss.value=curS;
+}
+
+function filterList(){
+  var q=document.getElementById('sb-search').value.trim().toLowerCase();
+  var fc=document.getElementById('f-coop').value;
+  var fs=document.getElementById('f-season').value;
+  var sk=document.getElementById('f-sort').value;
+  var filtered=fields.filter(function(f){
+    var mq=!q||(f.name.toLowerCase().includes(q)||(f.farmer||'').toLowerCase().includes(q)||(f.coop||'').toLowerCase().includes(q));
+    var mc=!fc||f.coop===fc;
+    var ms=!fs||f.season===fs;
+    return mq&&mc&&ms;
+  });
+  filtered.sort(function(a,b){
+    var av,bv;
+    if(sk==='name'){av=a.name.toLowerCase();bv=b.name.toLowerCase();}
+    else if(sk==='area'){av=calcArea(a.coords);bv=calcArea(b.coords);}
+    else if(sk==='farmer'){av=(a.farmer||'').toLowerCase();bv=(b.farmer||'').toLowerCase();}
+    else if(sk==='season'){av=(a.season||'');bv=(b.season||'');}
+    else{av=a.updatedAt;bv=b.updatedAt;}
+    if(av<bv)return sortDir==='asc'?-1:1;
+    if(av>bv)return sortDir==='asc'?1:-1;
+    return 0;
+  });
+  renderList(filtered);
+}
+
+function toggleSortDir(){
+  sortDir=sortDir==='asc'?'desc':'asc';
+  document.getElementById('sort-dir-btn').textContent=sortDir==='asc'?'↑ A-Z':'↓ Z-A';
+  filterList();
+}
+
+function renderList(list){
+  var arr=list||fields;
+  var el=document.getElementById('field-list');
+  if(!arr.length){el.innerHTML='<div style="padding:20px;text-align:center;color:#aaa;font-size:12px">No fields</div>';return;}
+  var html='';
+  arr.forEach(function(f){
+    var area=fmtArea(calcArea(f.coords));
+    html+='<div class="fi'+(currentFieldId===f.id?' active':'')+'" onclick="openDetail(\''+f.id+'\')">';
+    html+='<div style="display:flex;gap:6px;align-items:flex-start">';
+    html+='<div class="fi-dot" style="background:'+f.color+'"></div>';
+    html+='<div style="flex:1;min-width:0">';
+    html+='<div class="fi-name">'+xe(f.name)+'</div>';
+    html+='<div class="fi-sub">';
+    if(f.farmer)html+='<span>👤 '+xe(f.farmer)+'</span>';
+    if(f.season)html+='<span>🌾 '+xe(f.season)+'</span>';
+    html+='<span>📐 '+area+'</span>';
+    if(f.coop)html+='<span>🏢 '+xe(f.coop)+'</span>';
+    html+='</div></div></div></div>';
+  });
+  el.innerHTML=html;
+  // footer stats
+  var totalArea=fields.reduce(function(s,f){return s+calcArea(f.coords);},0);
+  document.getElementById('sb-count').textContent=fields.length+' '+t('fieldsSuffix');
+  document.getElementById('sb-area-total').textContent=(totalArea/10000).toFixed(2)+' '+t('haSuffix');
+  document.getElementById('total-fields-status').textContent=fields.length+' '+t('fieldsSuffix');
+}
+
+// ── DETAIL PANEL ───────────────────────────────────────────────────────────
+function openDetail(id){
+  currentFieldId=id;
+  document.getElementById('dp').classList.add('open');
+  dpTab('info');
+  renderDetailPanel(id);
+  renderList();
+  // highlight on map
+  Object.keys(mapLayers).forEach(function(fid){
+    mapLayers[fid].setStyle({weight:fid===id?4:2});
+  });
+}
+
+function closeDetail(){
+  currentFieldId=null;
+  document.getElementById('dp').classList.remove('open');
+  Object.keys(mapLayers).forEach(function(fid){mapLayers[fid].setStyle({weight:2});});
+  renderList();
+}
+
+function dpTab(tab){
+  ['info','log','photos','nav'].forEach(function(t){
+    document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
+    document.getElementById('dpt-'+t).classList.toggle('on',t===tab);
+  });
+  if(tab==='log')renderLogs();
+  if(tab==='photos')renderPhotos();
+  if(tab==='nav')renderNav();
+}
+
+function renderDetailPanel(id){
+  var f=fields.find(function(x){return x.id===id;});
+  if(!f)return;
+  document.getElementById('dp-field-name').textContent=f.name||'Field';
+  document.getElementById('dp-area').textContent=fmtArea(calcArea(f.coords));
+  document.getElementById('d-name').value=f.name||'';
+  document.getElementById('d-farmer').value=f.farmer||'';
+  document.getElementById('d-phone').value=f.phone||'';
+  document.getElementById('d-household').value=f.household||'';
+  document.getElementById('d-coop').value=f.coop||'';
+  document.getElementById('d-season').value=f.season||'';
+  document.getElementById('d-variety').value=f.variety||'';
+  document.getElementById('d-notes').value=f.notes||'';
+  document.getElementById('d-color').value=f.color||'#e53935';
+  renderCustomFieldsDP(f);
+}
+
+function saveField(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  f.name=document.getElementById('d-name').value.trim()||f.name;
+  f.farmer=document.getElementById('d-farmer').value.trim();
+  f.phone=document.getElementById('d-phone').value.trim();
+  f.household=document.getElementById('d-household').value.trim();
+  f.coop=document.getElementById('d-coop').value.trim();
+  f.season=document.getElementById('d-season').value.trim();
+  f.variety=document.getElementById('d-variety').value.trim();
+  f.notes=document.getElementById('d-notes').value.trim();
+  f.color=document.getElementById('d-color').value;
+  // custom fields
+  customFieldDefs.forEach(function(cf){
+    var el=document.getElementById('cf-dp-'+cf.id);
+    if(el)f.customValues[cf.id]=el.value;
+  });
+  f.updatedAt=new Date().toISOString();
+  recolorField(f);
+  mapLayers[f.id].bindTooltip(f.name,{permanent:false,direction:'center'});
+  document.getElementById('dp-field-name').textContent=f.name;
+  buildFilterOptions();
+  renderList();
+  markDirty();
+}
+
+function deleteField(){
+  if(!currentFieldId)return;
+  if(!confirm(t('deleteConfirm')))return;
+  fields=fields.filter(function(f){return f.id!==currentFieldId;});
+  if(mapLayers[currentFieldId]){drawnItems.removeLayer(mapLayers[currentFieldId]);delete mapLayers[currentFieldId];}
+  closeDetail();
+  buildFilterOptions();
+  renderList();
+  markDirty();
+}
+
+function zoomToField(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f||!mapLayers[f.id])return;
+  map.fitBounds(mapLayers[f.id].getBounds(),{padding:[40,40]});
+}
+
+// ── CUSTOM FIELDS ──────────────────────────────────────────────────────────
+function renderCustomFieldsDP(f){
+  var el=document.getElementById('custom-fields-dp');
+  if(!customFieldDefs.length){el.innerHTML='';return;}
+  var html='<div class="section-hdr" style="margin-top:10px">Custom fields</div>';
+  customFieldDefs.forEach(function(cf){
+    var val=(f.customValues&&f.customValues[cf.id])||'';
+    html+='<div class="fld"><label>'+xe(cf.name)+'</label>';
+    if(cf.type==='select'&&cf.opts){
+      html+='<select id="cf-dp-'+cf.id+'"><option value=""></option>';
+      cf.opts.forEach(function(o){html+='<option value="'+xe(o)+'"'+(val===o?' selected':'')+'>'+xe(o)+'</option>';});
+      html+='</select>';
+    } else {
+      html+='<input type="'+(cf.type==='date'?'date':cf.type==='number'?'number':'text')+'" id="cf-dp-'+cf.id+'" value="'+xe(val)+'">';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function openCustomFields(){
+  renderCFieldsList();
+  document.getElementById('cf-new-type').onchange=function(){
+    document.getElementById('cf-select-opts').style.display=this.value==='select'?'block':'none';
+  };
+  document.getElementById('ov-cfields').classList.add('on');
+}
+
+function renderCFieldsList(){
+  var el=document.getElementById('cfields-list');
+  if(!customFieldDefs.length){el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No custom columns yet.</div>';return;}
+  var html='';
+  customFieldDefs.forEach(function(cf,i){
+    html+='<div class="cfield-row"><span class="cf-name">'+xe(cf.name)+'</span><span class="cf-type">'+cf.type+'</span>';
+    html+='<button class="cf-del" onclick="removeCF('+i+')">✕</button></div>';
+  });
+  el.innerHTML=html;
+}
+
+function addCustomField(){
+  var name=document.getElementById('cf-new-name').value.trim();
+  var type=document.getElementById('cf-new-type').value;
+  if(!name)return;
+  var opts=[];
+  if(type==='select'){
+    var raw=document.getElementById('cf-opts').value;
+    opts=raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  }
+  customFieldDefs.push({id:'cf'+Date.now(),name:name,type:type,opts:opts});
+  document.getElementById('cf-new-name').value='';
+  document.getElementById('cf-opts').value='';
+  renderCFieldsList();
+  if(currentFieldId){var f=fields.find(function(x){return x.id===currentFieldId;});if(f)renderCustomFieldsDP(f);}
+  markDirty();
+}
+
+function removeCF(i){
+  customFieldDefs.splice(i,1);
+  renderCFieldsList();
+  if(currentFieldId){var f=fields.find(function(x){return x.id===currentFieldId;});if(f)renderCustomFieldsDP(f);}
+  markDirty();
+}
+
+// ── WATERING / ACTIVITY LOG ────────────────────────────────────────────────
+var currentLogType='watering';
+function addLogEntry(){currentLogType='watering';openLogModal();}
+function addActivityEntry(){currentLogType='activity';openLogModal();}
+function openLogModal(idx){
+  logEditIndex=idx!=null?idx:null;
+  document.getElementById('log-modal-title').textContent=logEditIndex!=null?'Edit entry':'Add entry';
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(logEditIndex!=null&&f){
+    var arr=currentLogType==='watering'?f.wateringLog:f.activityLog;
+    var entry=arr[logEditIndex];
+    if(entry){document.getElementById('log-date').value=entry.date||'';document.getElementById('log-note').value=entry.note||'';document.getElementById('log-type').value=entry.type||'watering';}
+  } else {
+    document.getElementById('log-date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('log-note').value='';
+    document.getElementById('log-type').value='watering';
+  }
+  document.getElementById('ov-log').classList.add('on');
+}
+function saveLogEntry(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  var entry={date:document.getElementById('log-date').value,type:document.getElementById('log-type').value,note:document.getElementById('log-note').value.trim()};
+  var arr=f.wateringLog;
+  if(logEditIndex!=null)arr.splice(logEditIndex,1,entry);
+  else arr.push(entry);
+  arr.sort(function(a,b){return b.date.localeCompare(a.date);});
+  closeM('ov-log');
+  renderLogs();
+  markDirty();
+}
+function renderLogs(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  function renderArr(arr,elId,type){
+    var el=document.getElementById(elId);
+    if(!arr.length){el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No entries.</div>';return;}
+    var h='';
+    arr.forEach(function(e,i){
+      h+='<div class="log-entry"><span class="log-date">'+e.date+'</span>';
+      h+=' <span style="background:#e6f1fb;color:#185fa5;padding:1px 6px;border-radius:3px;font-size:10px">'+xe(e.type||'')+'</span>';
+      if(e.note)h+='<div style="margin-top:4px;color:#444">'+xe(e.note)+'</div>';
+      h+='<button class="log-del" onclick="delLog(\''+type+'\','+i+')">✕</button></div>';
+    });
+    el.innerHTML=h;
+  }
+  renderArr(f.wateringLog,'log-entries','watering');
+  renderArr(f.activityLog,'activity-entries','activity');
+}
+function delLog(type,i){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  var arr=type==='watering'?f.wateringLog:f.activityLog;
+  arr.splice(i,1);
+  renderLogs();markDirty();
+}
+
+// ── PHOTOS ────────────────────────────────────────────────────────────────
+function renderPhotos(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  var g=document.getElementById('photo-grid');
+  var h='';
+  (f.photos||[]).forEach(function(p,i){
+    h+='<div style="position:relative"><img class="photo-thumb" src="'+p+'" onclick="viewPhoto(\''+i+'\')"><button onclick="delPhoto('+i+')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1">✕</button></div>';
+  });
+  h+='<div class="photo-add" onclick="document.getElementById(\'photo-input\').click()">+</div>';
+  g.innerHTML=h;
+}
+function viewPhoto(i){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  document.getElementById('photo-modal-img').src=f.photos[i];
+  document.getElementById('ov-photo').classList.add('on');
+}
+function delPhoto(i){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  f.photos.splice(i,1);
+  renderPhotos();markDirty();
+}
+function handlePhotoUpload(ev){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  Array.from(ev.target.files).forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      // Compress
+      var img=new Image();
+      img.onload=function(){
+        var canvas=document.createElement('canvas');
+        var max=900,w=img.width,h=img.height;
+        if(w>max){h=Math.round(h*max/w);w=max;}
+        if(h>max){w=Math.round(w*max/h);h=max;}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        f.photos.push(canvas.toDataURL('image/jpeg',0.72));
+        renderPhotos();markDirty();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  ev.target.value='';
+}
+
+// ── DIRECTIONS / NAV ──────────────────────────────────────────────────────
+function renderNav(){
+  var f=fields.find(function(x){return x.id===currentFieldId;});
+  if(!f)return;
+  var c=centroid(f.coords);
+  // From GPS
+  document.getElementById('nav-from-gps').href='https://www.google.com/maps/dir/Current+Location/'+c[0]+','+c[1];
+  // Field to field select
+  var sel=document.getElementById('nav-from-field');
+  sel.innerHTML='<option value="">'+t('selectField')+'</option>';
+  fields.forEach(function(x){
+    if(x.id===f.id)return;
+    var o=document.createElement('option');o.value=x.id;o.textContent=x.name;sel.appendChild(o);
+  });
+  sel.onchange=function(){
+    var from=fields.find(function(x){return x.id===sel.value;});
+    if(!from)return;
+    var fc=centroid(from.coords),tc=centroid(f.coords);
+    document.getElementById('nav-field-btn').href='https://www.google.com/maps/dir/'+fc[0]+','+fc[1]+'/'+tc[0]+','+tc[1];
+  };
+  // Coords
+  var coordStr=f.coords.map(function(c){return c[0].toFixed(6)+', '+c[1].toFixed(6);}).join('\n');
+  document.getElementById('field-coords').textContent=coordStr;
+}
+
+// ── GOOGLE DRIVE SYNC ──────────────────────────────────────────────────────
+var CLIENT_ID='1091618659692-jgbql8h2a3h6h03anh7pvbja99ppsnua.apps.googleusercontent.com';
+var SCOPE='https://www.googleapis.com/auth/drive';
+var accessToken=null,driveFileId=null,dirty=false,autoTimer=null,tokenClient=null;
+var configured=CLIENT_ID!=='YOUR_CLIENT_ID_HERE';
+
+window.onload=function(){
+  applyTranslations();
+  if(!configured){
+    setSS('x','Client ID not set — Google Drive disabled','');
+    document.getElementById('btn-login').style.display='none';
+  } else {
+    waitForGSI();
+  }
+  // Load locally saved file ID
+  var savedId=localStorage.getItem('fieldmap_file_id');
+  if(savedId)document.getElementById('connect-file-id').value=savedId;
+  filterList();
+};
+
+function waitForGSI(){
+  if(typeof google==='undefined'){setTimeout(waitForGSI,500);return;}
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPE,
+    callback:function(r){
+      if(r.error){setSS('r','Auth error: '+r.error,'');return;}
+      accessToken=r.access_token;
+      localStorage.setItem('fieldmap_autologin','1');
+      getUserInfo();
+      var fid=document.getElementById('connect-file-id').value.trim()||localStorage.getItem('fieldmap_file_id');
+      if(fid){driveFileId=fid;loadFromDrive();}
+      else{setSS('g','Signed in — no file connected yet','');}
+      startAutoSave();
+    }
+  });
+  if(localStorage.getItem('fieldmap_autologin')==='1'){
+    setTimeout(function(){tokenClient.requestAccessToken({prompt:'',hint:localStorage.getItem('fieldmap_email')||''});},400);
+  }
+}
+function signIn(){if(!tokenClient){alert('Google not loaded.');return;}tokenClient.requestAccessToken({prompt:'consent'});}
+function signOut(){
+  if(accessToken)try{google.accounts.oauth2.revoke(accessToken);}catch(e){}
+  accessToken=null;dirty=false;
+  localStorage.removeItem('fieldmap_autologin');localStorage.removeItem('fieldmap_email');
+  document.getElementById('uinfo').style.display='none';
+  document.getElementById('btn-logout').style.display='none';
+  document.getElementById('btn-save').style.display='none';
+  document.getElementById('btn-login').style.display='inline-block';
+  stopAutoSave();setSS('x','Signed out','');
+}
+function getUserInfo(){
+  fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}})
+  .then(function(r){return r.json();}).then(function(u){
+    document.getElementById('uname').textContent=u.name||u.email;
+    document.getElementById('uavatar').src=u.picture||'';
+    document.getElementById('uinfo').style.display='flex';
+    document.getElementById('btn-login').style.display='none';
+    document.getElementById('btn-logout').style.display='inline-block';
+    document.getElementById('btn-save').style.display='inline-block';
+    if(u.email)localStorage.setItem('fieldmap_email',u.email);
+  });
+}
+function setSS(c,m,t){
+  var cls={'g':'d-g','y':'d-y','r':'d-r','x':'d-x'};
+  document.getElementById('sync-dot').className='dot '+(cls[c]||'d-x');
+  document.getElementById('sync-msg').textContent=m;
+}
+function markDirty(){dirty=true;if(accessToken)setSS('y','Unsaved changes','');}
+
+function loadFromDrive(){
+  setSS('y','Loading...','');
+  fetch('https://www.googleapis.com/drive/v3/files/'+driveFileId+'?alt=media',{
+    headers:{Authorization:'Bearer '+accessToken}
+  }).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(d){
+    if(d.fields){fields=d.fields;}
+    if(d.customFieldDefs){customFieldDefs=d.customFieldDefs;}
+    if(d.fields&&d.fields.length)nid=d.fields.reduce(function(m,f){return Math.max(m,parseInt(f.id.replace('f',''))||0);},0)+1;
+    loadAllFieldsToMap();
+    buildFilterOptions();
+    filterList();
+    setSS('g','Synced','Last loaded: '+new Date().toLocaleTimeString());
+    // Zoom to data
+    if(fields.length&&Object.keys(mapLayers).length){
+      map.fitBounds(drawnItems.getBounds(),{padding:[30,30]});
+    }
+  }).catch(function(e){setSS('r','Load failed: '+e.message,'');});
+}
+
+function saveNow(){
+  if(!accessToken){alert('Sign in first.');return;}
+  setSS('y','Saving...','');
+  var payload=JSON.stringify({fields:fields,customFieldDefs:customFieldDefs,savedAt:new Date().toISOString()});
+  var meta={name:'fieldmap_data.json'};
+  var body='--b\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(meta)+'\r\n--b\r\nContent-Type: application/json\r\n\r\n'+payload+'\r\n--b--';
+  var url=driveFileId?'https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=multipart':'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+  fetch(url,{method:driveFileId?'PATCH':'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'multipart/related; boundary=b'},body:body})
+  .then(function(r){return r.json();}).then(function(res){
+    if(res.id){driveFileId=res.id;localStorage.setItem('fieldmap_file_id',res.id);}
+    dirty=false;
+    setSS('g','Saved','Last saved: '+new Date().toLocaleTimeString());
+  }).catch(function(e){setSS('r','Save failed: '+e.message,'');});
+}
+
+function startAutoSave(){
+  stopAutoSave();
+  autoTimer=setInterval(function(){if(dirty&&accessToken)saveNow();},5*60*1000);
+}
+function stopAutoSave(){if(autoTimer)clearInterval(autoTimer);autoTimer=null;}
+
+function openConnect(){
+  document.getElementById('connect-file-id').value=localStorage.getItem('fieldmap_file_id')||'';
+  document.getElementById('connect-status').textContent='';
+  document.getElementById('ov-connect').classList.add('on');
+}
+function applyConnect(){
+  var fid=document.getElementById('connect-file-id').value.trim();
+  if(fid){
+    driveFileId=fid;
+    localStorage.setItem('fieldmap_file_id',fid);
+    document.getElementById('connect-status').textContent='File ID saved.';
+    if(accessToken){loadFromDrive();}
+    else{document.getElementById('connect-status').textContent='File ID saved. Sign in to load data.';}
+  } else {
+    driveFileId=null;
+    localStorage.removeItem('fieldmap_file_id');
+    document.getElementById('connect-status').textContent='Cleared — will create new file on next save.';
+  }
+  setTimeout(function(){closeM('ov-connect');},1000);
+}
+
+// ── IMPORT / EXPORT GEOJSON ───────────────────────────────────────────────
+function openImportExport(){exportGeoJSON();document.getElementById('ov-io').classList.add('on');}
+function exportGeoJSON(){
+  var gj={type:'FeatureCollection',features:fields.map(function(f){
+    return{type:'Feature',geometry:{type:'Polygon',coordinates:[f.coords.map(function(c){return[c[1],c[0]];})]},
+    properties:{id:f.id,name:f.name,farmer:f.farmer,phone:f.phone,household:f.household,coop:f.coop,season:f.season,variety:f.variety,notes:f.notes,area_m2:Math.round(calcArea(f.coords)),color:f.color,updatedAt:f.updatedAt}};
+  })};
+  document.getElementById('io-area').value=JSON.stringify(gj,null,2);
+}
+function importGeoJSON(){
+  try{
+    var gj=JSON.parse(document.getElementById('io-area').value);
+    if(gj.type!=='FeatureCollection')throw new Error('Not a FeatureCollection');
+    gj.features.forEach(function(feat){
+      var p=feat.properties||{};
+      var coords=feat.geometry.coordinates[0].map(function(c){return[c[1],c[0]];});
+      var f={id:'f'+Date.now()+Math.random(),name:p.name||'Imported',farmer:p.farmer||'',phone:p.phone||'',household:p.household||'',coop:p.coop||'',season:p.season||'',variety:p.variety||'',notes:p.notes||'',color:p.color||'#e53935',coords:coords,wateringLog:[],activityLog:[],photos:[],customValues:{},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+      fields.push(f);
+      addFieldToMap(f);
+    });
+    buildFilterOptions();filterList();closeM('ov-io');markDirty();
+    if(fields.length)map.fitBounds(drawnItems.getBounds(),{padding:[30,30]});
+  }catch(e){alert('GeoJSON error: '+e.message);}
+}
+function downloadGeoJSON(){
+  exportGeoJSON();
+  var text=document.getElementById('io-area').value;
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/geo+json'}));a.download='fields.geojson';a.click();
+}
+function copyIO(){var el=document.getElementById('io-area');el.select();document.execCommand('copy');}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function closeM(id){document.getElementById(id).classList.remove('on');}
+function bgClose(id,e){if(e.target===document.getElementById(id))closeM(id);}
+</script>
+</body>
+</html>
